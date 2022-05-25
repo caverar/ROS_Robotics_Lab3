@@ -65,21 +65,21 @@ class Movement:
 def moveRobot(T, l, movement, direction):
     codo = 0 #0: down, 1: up
     print("Before: ", T)
+    print("Previous position: ", T[:,3])
     changeMatrix(T, movement, direction)
     print("After: ", T)
-    print("Position: ", T[:,3])
+    print("Current position: ", T[:,3])
     q = np.degrees(getInvKin(T, l))
     goal_position_raw = deg2raw(q[codo,:])
     moveJoints(goal_position_raw, q[codo, :])
-    
-    #primero a change matrix- dependiendo de si es ROT se hace algo y si no se hace lo otro
-    #luego a getInv
-    #luego a move joints
-    pass
 
 def changeMatrix(T, movement, direction):
     if movement.name == "rot":
-        T[0:3, 0:3]
+        angle = math.radians(movement.step)*direction
+        c = math.cos(angle)
+        s = math.sin(angle)
+        rot_y = np.array[[c, 0, s], [0, 1, 0], [-s, 0, c]]
+        T[0:3, 0:3] == T[0:3, 0:3]*rot_y
     else:
         if(movement.name == "trax"): row = 0
         elif(movement.name == "tray"): row = 1
@@ -94,7 +94,7 @@ def moveJoints(goal_position_raw, q):
         #jointCommand('', motors_ids[i], 'Goal_Position', goal_position_raw[i], 0.5)
         print("Moving ID:", motors_ids[i], " Angle: ", q[i], " Raw: ", goal_position_raw[i])
 
-def main(step: list = [2,20 ,2,2]):
+def main(step: list = [2, 2 ,2, 45]):
     l = [14.5, 10.7, 10.7, 9]
     
 
@@ -114,6 +114,8 @@ def main(step: list = [2,20 ,2,2]):
     q = np.degrees(getInvKin(T, l))
     goal_position_raw = deg2raw(q[0,:])
     moveJoints(goal_position_raw, q[0, :])
+
+
     moveRobot(T, l, TRAY, -1)
 
 
