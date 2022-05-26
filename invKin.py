@@ -63,29 +63,41 @@ class Movement:
          self.step = step
 
 def moveRobot(T, l, movement, direction):
-    codo = 0 #0: down, 1: up
-    print("Before: ", T)
-    print("Previous position: ", T[:,3])
-    changeMatrix(T, movement, direction)
-    print("After: ", T)
-    print("Current position: ", T[:,3])
-    q = np.degrees(getInvKin(T, l))
-    goal_position_raw = deg2raw(q[codo,:])
-    moveJoints(goal_position_raw, q[codo, :])
+    codo = 0 #0: down, 1: up    
+    previous_T = T.copy()
+    #print("Previous position: ", T[:,3])
+    T = changeMatrix(T, movement, direction)
+    #print("Current position: ", T[:,3])
+    try:
+        q = np.degrees(getInvKin(T, l))
+        goal_position_raw = deg2raw(q[codo,:])
+        moveJoints(goal_position_raw, q[codo, :])
+    except:        
+        print("Exception...\n")
+        T = previous_T.copy()
+    return T
+
+
+
 
 def changeMatrix(T, movement, direction):
     if movement.name == "rot":
+        print("Rotation")
         angle = math.radians(movement.step)*direction
         c = math.cos(angle)
         s = math.sin(angle)
-        rot_y = np.array[[c, 0, s], [0, 1, 0], [-s, 0, c]]
-        T[0:3, 0:3] == T[0:3, 0:3]*rot_y
+        rot_y = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+        T[0:3, 0:3] = np.dot(T[0:3, 0:3],rot_y)
+        
     else:
+        print("Traslation")
         if(movement.name == "trax"): row = 0
         elif(movement.name == "tray"): row = 1
         elif(movement.name == "traz"): row = 2
 
         T[row, 3] = T[row, 3] + movement.step * direction  
+    return T
+
 
 
 def moveJoints(goal_position_raw, q):
@@ -95,6 +107,7 @@ def moveJoints(goal_position_raw, q):
         print("Moving ID:", motors_ids[i], " Angle: ", q[i], " Raw: ", goal_position_raw[i])
 
 def main(step: list = [2, 2 ,2, 45]):
+    
     l = [14.5, 10.7, 10.7, 9]
     
 
@@ -107,6 +120,7 @@ def main(step: list = [2, 2 ,2, 45]):
     TRAY = Movement("tray", step[1])
     TRAZ = Movement("traz", step[2])
     ROT  = Movement("rot",  step[3])    
+    movements = [TRAX, TRAY, TRAZ, ROT]
 
     print("--- Inverse Kinematics with Python and ROS ---")
     # For initial position
@@ -114,34 +128,28 @@ def main(step: list = [2, 2 ,2, 45]):
     q = np.degrees(getInvKin(T, l))
     goal_position_raw = deg2raw(q[0,:])
     moveJoints(goal_position_raw, q[0, :])
-
-
-    moveRobot(T, l, TRAY, -1)
-
-
-    # movements = [TRAX, TRAY, TRAZ, ROT]
-    # i = 3
     
-    # changeMatrix(T, movements[i], -1)
-    # print("After:\n", T)
-
-    # while(True):
-    #     print("Enter key: ")
-    #     key = getKey()
+    i = 0
+    
+    while(True):
+        print("T now:\n", T)
+        print("Enter key: ")
+        key = getKey()
         
-    #     if(key == "w"):
-    #         i = (i+1)%4s
-    #         print("Current movement is: ", movements[i].name, "\n")
+        if(key == "w"):
+            i = (i+1)%4
+            print("Current movement is: ", movements[i].name, "\n")
 
-    #     elif(key == "s"):
-    #         i = (i-1)%4
-    #         print("Current movement is: ", movements[i].name, "\n")
+        elif(key == "s"):
+            i = (i-1)%4
+            print("Current movement is: ", movements[i].name, "\n")
 
-    #     elif(key == "d"):
-    #         print("Movement: ", movements[i].name, " to: ", movements[i].step)
-    #         #moveRobot
-    #     elif(key == "a"):
-    #         print("Movement: ", movements[i].name, " to: ", -1*movements[i].step)
+        elif(key == "d"):
+            print("Movement: ", movements[i].name, " of: ", movements[i].step)
+            T = moveRobot(T, l, movements[i], 1)
+        elif(key == "a"):
+            print("Movement: ", movements[i].name, " of: ", -1*movements[i].step)
+            T = moveRobot(T, l, movements[i], -1)
 
 
 
