@@ -53,7 +53,7 @@ def jointCommand(command, id_num, addr_name, value, time):
 def deg2raw(input_list: list = [0,0,0,0], min_deg: int = -150, max_deg: int = 150)->list:
     out_list = [0,0,0,0]
     for i in range(len(input_list)):
-        out_list[i] = int( ((input_list[i] - min_deg)*1024)/(max_deg-min_deg) )
+        out_list[i] = int( ((input_list[i] - min_deg)*1023)/(max_deg-min_deg) )
     return out_list
 
 
@@ -101,15 +101,21 @@ def changeMatrix(T, movement, direction):
 
 
 def moveJoints(goal_position_raw, q):
-    motors_ids = [6,7,8,9]
-    for i in range(len(motors_ids)):
-        #jointCommand('', motors_ids[i], 'Goal_Position', goal_position_raw[i], 0.5)
+    motors_ids = [1,2,3,4]
+    for i in reversed(range(len(motors_ids))):
+        jointCommand('', motors_ids[i], 'Goal_Position', goal_position_raw[i], 0.5)
         print("Moving ID:", motors_ids[i], " Angle: ", q[i], " Raw: ", goal_position_raw[i])
 
+def adjustTorque():
+    motors_ids = [1,2,3,4]
+    torque = [400, 400, 400, 400]
+    for i in range(len(motors_ids)):
+        pass
+        jointCommand('', motors_ids[i], 'Torque_Limit', torque[i], 0)
+
+
 def main(step: list = [2, 2 ,2, 45]):
-    
-    l = [14.5, 10.7, 10.7, 9]
-    
+    l = [14.5, 10.7, 10.7, 9]    
 
     T = np.array([[0.4096,   -0.8660,    0.2868,   11.7068],
                   [0.7094,    0.5000,    0.4967,   20.2768],
@@ -123,6 +129,11 @@ def main(step: list = [2, 2 ,2, 45]):
     movements = [TRAX, TRAY, TRAZ, ROT]
 
     print("--- Inverse Kinematics with Python and ROS ---")
+
+    #Torque adjustment
+    adjustTorque()    
+
+
     # For initial position
     print("Initial Position: ", T[:,3])
     q = np.degrees(getInvKin(T, l))
@@ -150,9 +161,6 @@ def main(step: list = [2, 2 ,2, 45]):
         elif(key == "a"):
             print("Movement: ", movements[i].name, " of: ", -1*movements[i].step)
             T = moveRobot(T, l, movements[i], -1)
-
-
-
 
 if __name__ == '__main__':
     try:
