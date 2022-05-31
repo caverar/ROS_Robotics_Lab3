@@ -98,22 +98,122 @@ The last application that we developed for this lab relates to the whole robot's
 
 To create the movements that will allows us to control the PhantomX, the class _Movement_ was created in the file _invKin.py_.
 
-```
-def jointCommand(command, id_num, addr_name, value, time):
-    
-    """
-    Make a request to a the "dynamixel_command" ros service to modify a  
-    parameter such as position or torque of the motor specified by the "id_num" 
-    parameter.
-    """
-    rospy.wait_for_service('dynamixel_workbench/dynamixel_command')
-    try:        
-        dynamixel_command = rospy.ServiceProxy('/dynamixel_workbench/dynamixel_command', DynamixelCommand)
-        result = dynamixel_command(command,id_num,addr_name,value)
-        rospy.sleep(time)
-        return result.comm_result
-    except rospy.ServiceException as exc:
-        print(str(exc))
+```python
+class Movement:
+    def __init__(self, name , step):
+         self.name = name
+         self.step = step
 ```
 
+In this class we define the name of the movement and the step, which refers to the change of value that we will have.
 
+For our application we have 4 different movements:
+ 
+* TRAX = Axis-x translation with a step of 1 cm.
+* TRAY = Axis-y translation with a step of 1 cm.
+* TRAZ = Axis-z translation with a step of 1 cm.
+* ROT  = Rotation with a step of 10 degrees. 
+
+All of these movements are created and added to a list called movements
+
+```python
+TRAX = Movement("trax", step[0])
+    TRAY = Movement("tray", step[1])
+    TRAZ = Movement("traz", step[2])
+    ROT  = Movement("rot",  step[3])    
+    movements = [TRAX, TRAY, TRAZ, ROT]
+
+```
+The creation of this list will help us to iterate through all the movements depending on the keyboard input. If we get a _w_, we will move to the next movement. If we get an _s_, we will move to the previous movement. In both cases we will print the name of the movement we are in. The exciting part comes when we get a _d_ or an _a_. For those cases, we will move a positive or negative step, respectively, in the movement we are in.
+
+```python
+while(True):
+        print("T now:\n", T)
+        print("Enter key: ")
+        key = getKey()
+        
+        if(key == "w"):
+            i = (i+1)%4
+            print("Current movement is: ", movements[i].name, "\n")
+
+        elif(key == "s"):
+            i = (i-1)%4
+            print("Current movement is: ", movements[i].name, "\n")
+
+        elif(key == "d"):
+            print("Movement: ", movements[i].name, " of: ", movements[i].step)
+            T = moveRobot(T, l, movements[i], 1)
+        elif(key == "a"):
+            print("Movement: ", movements[i].name, " of: ", -1*movements[i].step)
+            T = moveRobot(T, l, movements[i], -1)
+```
+
+As you can see from the function above, all the magic occurs in the fuction _moveRobot_. This function receives as parameters the MTH of the end effector, _T_, the length of the links saved in the list _l_, the corresponding movement and a 1 if the step will be positive or a -1 in case it is negative.
+
+### How do we move our Phantom X?
+
+Well, the interesting part comes when we try to understand how the function _moveRobot_ works.
+
+
+```python
+def moveRobot(T, l, movement, direction):
+    codo = 1 #0: down, 1: up    
+    previous_T = T.copy()
+    T = changeMatrix(T, movement, direction)
+    try:
+        q = np.degrees(getInvKin(T, l))
+        goal_position_raw = deg2raw(q[codo,:])
+        moveJoints(goal_position_raw, q[codo, :])
+    except:        
+        print("Exception...\n")
+        T = previous_T.copy()
+    return T
+```
+
+The first thing that we can see is the choice of the elbow. We can have elbow up or down for our 2R mechanism explained in the section of inverse kinematics. After this, we copy the MTH of the end effector in the variable _previous T_ just in case we reach a position that is outside the robot's workspace. After this, we call the function _changeMatrix_, (we will see it later, don't worry), which updates the MTH. Having the MTH, we can now call the inverse kinematics function called _getInvKin_ and transform the answer that we get from radians to degrees and save it in the variable _q_. This last variable contains the values of the joints in both configurations: elbow up and elbow down. That's why we have to choose which one we want to use. 
+
+With the value of _q_ we can now call our mapping function that converts degrees to raw data which is directly received by the joints of our Phantom X (-150 to 150 degrees is now 0 to 1023). And with this information we can now call our function _moveJoints_ and see the magic happening. But before doing that, let's explain the functions that we are missing.
+
+### Change matrix function
+
+With this function, we modify the values of the MTH that we get. If we have the movement of rotation, we multiply the rotation matrix of the MTH by a rotation in the y-axis on an angle equal to step, taking into account if it's positive or negative. (Do you remember the 1 and -1? Yeah, it's exactly here where we use it). 
+
+On the other hand, if we get a translation movement, we will change the component of the vector of position depending on the axis that we are interested in and that's it :)
+
+```python
+def changeMatrix(T, movement, direction):
+    if movement.name == "rot":
+        print("Rotation")
+        angle = math.radians(movement.step)*direction
+        c = math.cos(angle)
+        s = math.sin(angle)
+        rot_y = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+        T[0:3, 0:3] = np.dot(T[0:3, 0:3],rot_y)
+        
+    else:
+        print("Traslation")
+        if(movement.name == "trax"): row = 0
+        elif(movement.name == "tray"): row = 1
+        elif(movement.name == "traz"): row = 2
+
+        T[row, 3] = T[row, 3] + movement.step * direction  
+    return T
+```
+
+### Moving the joints
+
+Finally with the function, we call the service dynamixel command and pass the corresponding parameters for each joint using the raw data that we calculated. 
+
+```python
+def moveJoints(goal_position_raw, q):
+    motors_ids = [1,2,3,4]
+    for i in reversed(range(len(motors_ids))):
+        jointCommand('', motors_ids[i], 'Goal_Position', goal_position_raw[i], 0.5)
+        print("Moving ID:", motors_ids[i], " Angle: ", q[i], " Raw: ", goal_position_raw[i])
+```
+
+Now we have all the ingredients ready for this great recipe. Let's see how it tastes in the following link: [Video - Motion in robot's workspace ](https://www.youtube.com/watch?v=eJQ3HbZY1dU).
+
+## Conclusions
+
+Learning to use tools may require a little bit of time but after a while you will figure out how it works. We, as engineering students, shouldn't worry too much about this. The thing that really matters and that can make a big difference is the understanding of the core concepts on which the whole system is based. In this case, a good understanding of the inverse kinematics allowed us to do our own implementation which was fundamental to implement the solution of both applications. 
