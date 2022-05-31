@@ -65,9 +65,7 @@ class Movement:
 def moveRobot(T, l, movement, direction):
     codo = 1 #0: down, 1: up    
     previous_T = T.copy()
-    #print("Previous position: ", T[:,3])
     T = changeMatrix(T, movement, direction)
-    #print("Current position: ", T[:,3])
     try:
         q = np.degrees(getInvKin(T, l))
         goal_position_raw = deg2raw(q[codo,:])
