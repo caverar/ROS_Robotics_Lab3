@@ -63,11 +63,9 @@ class Movement:
          self.step = step
 
 def moveRobot(T, l, movement, direction):
-    codo = 0 #0: down, 1: up    
+    codo = 1 #0: down, 1: up    
     previous_T = T.copy()
-    #print("Previous position: ", T[:,3])
     T = changeMatrix(T, movement, direction)
-    #print("Current position: ", T[:,3])
     try:
         q = np.degrees(getInvKin(T, l))
         goal_position_raw = deg2raw(q[codo,:])
@@ -108,19 +106,24 @@ def moveJoints(goal_position_raw, q):
 
 def adjustTorque():
     motors_ids = [1,2,3,4]
-    torque = [400, 400, 400, 400]
+    torque = [500, 800, 500, 500]
     for i in range(len(motors_ids)):
-        pass
         jointCommand('', motors_ids[i], 'Torque_Limit', torque[i], 0)
 
+def enableTorque():
+    motors_ids = [1,2,3,4]
+    for i in range(len(motors_ids)):
+        jointCommand('', motors_ids[i], 'Torque_Enable', 1, 0)
 
-def main(step: list = [2, 2 ,2, 45]):
+
+def main(step: list = [1, 1 , 1, 10]):
+    codo = 1
     l = [14.5, 10.7, 10.7, 9]    
 
-    T = np.array([[0.4096,   -0.8660,    0.2868,   11.7068],
-                  [0.7094,    0.5000,    0.4967,   20.2768],
-                  [ -0.5736,   -0.0000,    0.8192,   32.4098], 
-                  [0, 0, 0, 1]])
+    T = np.array([[1.0,   0.0,    0.0,   0.0],
+                  [0.0,   1.0,    0.0,   0.0],
+                  [0.0,   0.0,    1.0,   44.9], 
+                  [0.0, 0.0, 0.0, 1.0]])
 
     TRAX = Movement("trax", step[0])
     TRAY = Movement("tray", step[1])
@@ -130,15 +133,17 @@ def main(step: list = [2, 2 ,2, 45]):
 
     print("--- Inverse Kinematics with Python and ROS ---")
 
+    #Enable torque
+
+    enableTorque()
     #Torque adjustment
     adjustTorque()    
-
 
     # For initial position
     print("Initial Position: ", T[:,3])
     q = np.degrees(getInvKin(T, l))
-    goal_position_raw = deg2raw(q[0,:])
-    moveJoints(goal_position_raw, q[0, :])
+    goal_position_raw = deg2raw(q[codo,:])
+    moveJoints(goal_position_raw, q[codo, :])
     
     i = 0
     
